@@ -4323,7 +4323,9 @@ function renderSegmentsSummary(segments) {
   summary.innerHTML = segments.map(s => {
     const flt = s.flight_number || '?';
     const route = (s.from || '?') + '→' + (s.to || '?');
-    const dt = (s.dep_date ? fmtDate(s.dep_date) : '?') + (s.dep_time ? ' ' + s.dep_time : '');
+    const depPart = (s.dep_date ? fmtDate(s.dep_date) : '?') + (s.dep_time ? ' ' + s.dep_time : '');
+    const arrPart = s.arr_time ? ' → ' + s.arr_time : '';
+    const dt = depPart + arrPart;
     const cls = s.class_of_service ? `<span class="cls">${escapeHtml(s.class_of_service)}</span>` : '';
     return `<div class="seg-line">
       <span class="flt">${escapeHtml(flt)}</span>
@@ -8370,6 +8372,9 @@ function openGdsImportModal() {
   document.getElementById('gdsMarkupPct').value = '';
   document.getElementById('gdsSourceOverride').value = '';
   document.getElementById('gdsImportModal').classList.add('open');
+  // Reset wire guard so drop zone re-binds on each open
+  const dz = document.getElementById('gdsDropZone');
+  if (dz) dz._mirWired = false;
   wireGdsDropZone();
 }
 
@@ -8388,32 +8393,31 @@ function gdsImportBack() {
 
 function wireGdsDropZone() {
   const dz = document.getElementById('gdsDropZone');
-  const input = document.getElementById('gdsFileInput');
+  const inputEl = document.getElementById('gdsFileInput');
+  if (!dz || !inputEl) return;
 
-  // Avoid double-binding by replacing the node
-  const dzNew = dz.cloneNode(true);
-  dz.parentNode.replaceChild(dzNew, dz);
+  // Guard against double-binding
+  if (dz._mirWired) return;
+  dz._mirWired = true;
 
-  const inputNew = document.getElementById('gdsFileInput');
-
-  dzNew.addEventListener('dragover', e => {
+  dz.addEventListener('dragover', e => {
     e.preventDefault();
-    dzNew.style.background = '#e0e7ff';
-    dzNew.style.borderColor = 'var(--accent)';
+    dz.style.background = '#e0e7ff';
+    dz.style.borderColor = 'var(--accent)';
   });
-  dzNew.addEventListener('dragleave', () => {
-    dzNew.style.background = 'var(--bg-page)';
-    dzNew.style.borderColor = 'var(--border-strong)';
+  dz.addEventListener('dragleave', () => {
+    dz.style.background = 'var(--bg-page)';
+    dz.style.borderColor = 'var(--border-strong)';
   });
-  dzNew.addEventListener('drop', e => {
+  dz.addEventListener('drop', e => {
     e.preventDefault();
-    dzNew.style.background = 'var(--bg-page)';
-    dzNew.style.borderColor = 'var(--border-strong)';
+    dz.style.background = 'var(--bg-page)';
+    dz.style.borderColor = 'var(--border-strong)';
     if (e.dataTransfer.files.length > 0) {
       handleGdsFile(e.dataTransfer.files[0]);
     }
   });
-  inputNew.addEventListener('change', e => {
+  inputEl.addEventListener('change', e => {
     if (e.target.files.length > 0) {
       handleGdsFile(e.target.files[0]);
     }
@@ -10258,7 +10262,7 @@ function parseMirXml(text, fileName) {
         arr_time: arrTime,
         airline: airlineCode,
         flight_number: airlineCode + flightNum,
-        cabin: cabin
+        class_of_service: cabin
       };
     }).filter(Boolean);
 
