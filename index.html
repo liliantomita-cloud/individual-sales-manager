@@ -511,7 +511,6 @@ body.sidebar-collapsed .sidebar-footer { padding: 8px; }
           </div>
           <button class="btn btn-secondary" onclick="openParserModal()">📋 Paste Amadeus</button>
           <button class="btn btn-secondary" onclick="openAiParserModal()">🤖 Paste online</button>
-          <button class="btn btn-secondary" onclick="openItineraryModal()">✈️ Itinerary</button>
           <button class="btn btn-primary" onclick="openTicketModal()">+ New Ticket</button>
         </div>
         <div id="ticketsContainer"></div>
@@ -1141,29 +1140,21 @@ body.sidebar-collapsed .sidebar-footer { padding: 8px; }
 
 <!-- ============== ITINERARY MODAL ============== -->
 <div class="modal-overlay" id="itineraryModal">
-  <div class="modal" style="max-width: 640px;">
+  <div class="modal" style="max-width:640px;">
     <div class="modal-header">
       <div class="modal-title">✈️ Generate Travel Itinerary</div>
       <button class="modal-close" onclick="closeItineraryModal()">×</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">
-        Select tickets to include and choose options. All selected tickets will appear in one document.
-      </p>
-
-      <!-- Ticket list -->
-      <div id="itineraryTicketList" style="max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:6px;margin-bottom:16px;"></div>
-
-      <!-- Options row -->
-      <div style="display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap;margin-bottom:4px;">
-        <div class="form-field" style="flex:0 0 auto;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
-            <input type="checkbox" id="itineraryShowPrice" style="width:15px;height:15px;">
-            Show total price
-          </label>
-        </div>
-        <div class="form-field" style="flex:0 0 auto;">
-          <label style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;display:block;">Language</label>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">Select tickets to include. All selected tickets appear in one document.</p>
+      <div id="itineraryTicketList" style="max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:6px;margin-bottom:14px;"></div>
+      <div style="display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+          <input type="checkbox" id="itineraryShowPrice" style="width:15px;height:15px;">
+          Show total price
+        </label>
+        <div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">Language</div>
           <select id="itineraryLang" style="padding:5px 10px;font-size:13px;border-radius:4px;border:1px solid var(--border);">
             <option value="EN">English</option>
             <option value="RO">Română</option>
@@ -1172,10 +1163,10 @@ body.sidebar-collapsed .sidebar-footer { padding: 8px; }
       </div>
     </div>
     <div class="modal-footer">
-      <span class="hint" id="itineraryFooterHint"></span>
+      <span style="font-size:12px;color:var(--text-muted);" id="itineraryHint"></span>
       <div class="modal-footer-spacer"></div>
       <button type="button" class="btn btn-ghost" onclick="closeItineraryModal()">Cancel</button>
-      <button type="button" class="btn btn-primary" id="itineraryGenerateBtn" onclick="generateItineraryPdf()">📄 Generate PDF</button>
+      <button type="button" class="btn btn-primary" id="itineraryGenBtn" onclick="generateItineraryPdf()" disabled>📄 Generate PDF</button>
     </div>
   </div>
 </div>
@@ -3269,6 +3260,7 @@ function renderTickets() {
     (showRef ? '<th>Client Ref</th>' : '') +
     '<th>🚩</th>' +
     '<th>Agent</th>' +
+    '<th style="width:34px;"></th>' +
     '</tr></thead><tbody>';
 
   // Visual grouping: track which transaction we're inside to render group dividers
@@ -3411,7 +3403,7 @@ function renderTickets() {
       ${selectCell}
       <td class="cell-date">${fmtDate(t.issue_date)}</td>
       <td>${refCell}</td>
-      <td class="cell-pax">${escapeHtml((pax.last_name || '') + '/' + (pax.first_name || ''))}<span class="pax-meta">${escapeHtml(t.passenger_type || '')}${statusBadgeHtml}${inGroup ? ' · ' + (t.document_seq || '?') + ' of ' + txSizes[t.transaction_id] : ''}</span></td>
+      <td class="cell-pax">${escapeHtml((pax.last_name || '') + '/' + (pax.first_name || ''))}<span class="pax-meta">${statusBadgeHtml}${inGroup ? ' · ' + (t.document_seq || '?') + ' of ' + txSizes[t.transaction_id] : ''}</span></td>
       <td class="cell-client editable-cell" title="Click to change client" onclick="event.stopPropagation(); inlineEditClient('${t.id}', this)">${escapeHtml(clientName) || '<span class="cell-empty">— set —</span>'}</td>
       <td class="cell-route">${escapeHtml(route)}</td>
       <td>${airlinePill(t)}</td>
@@ -3425,6 +3417,7 @@ function renderTickets() {
       ${showRef ? `<td class="cell-mono" style="font-size:11px;">${escapeHtml(t.client_reference || '')}</td>` : ''}
       <td style="text-align:center;"><span class="flag-icon ${t.attention_flag ? '' : 'muted'}">🚩</span></td>
       <td class="editable-cell" title="Click to change agent" onclick="event.stopPropagation(); inlineEditAgent('${t.id}', this)"><span class="agent-pill">${escapeHtml(agentInitials(t.agent))}</span></td>
+      <td style="text-align:center;"><button class="btn btn-ghost" style="padding:2px 7px;font-size:11px;" title="Generate itinerary" onclick="event.stopPropagation(); openItineraryModal('${t.id}')">✈️</button></td>
     </tr>`;
   }
   html += '</tbody></table></div>';
@@ -10376,152 +10369,92 @@ function parseMirXml(text, fileName) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TRAVEL ITINERARY PDF  (Phase 2.5 — generates Anyway-branded itinerary PDF)
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// TRAVEL ITINERARY PDF
+// ═════════════════════════════════════════════════════════════════════════════
 
-// Airport timezone offsets from UTC (standard time; DST handled separately)
-// Format: [utcOffset_standard, utcOffset_summer] (IANA-approximate)
 const AIRPORT_TZ = {
-  // Moldova / Romania
-  RMO: [2, 3], KIV: [2, 3], OTP: [2, 3], CLJ: [2, 3], IAS: [2, 3], SBZ: [2, 3],
-  // UK / Ireland
-  LHR: [0, 1], LGW: [0, 1], STN: [0, 1], LTN: [0, 1], MAN: [0, 1], BHX: [0, 1],
-  EDI: [0, 1], GLA: [0, 1], DUB: [0, 1], ORK: [0, 1], BFS: [0, 1],
-  // Western Europe (CET/CEST UTC+1/+2)
-  CDG: [1, 2], ORY: [1, 2], NCE: [1, 2], LYS: [1, 2], MRS: [1, 2], BOD: [1, 2],
-  TLS: [1, 2], NTE: [1, 2], SXB: [1, 2], MLH: [1, 2],
-  FRA: [1, 2], MUC: [1, 2], BER: [1, 2], DUS: [1, 2], HAM: [1, 2], CGN: [1, 2],
-  STR: [1, 2], NUE: [1, 2], LEJ: [1, 2], HAJ: [1, 2],
-  AMS: [1, 2], EIN: [1, 2], RTM: [1, 2],
-  BRU: [1, 2], LGG: [1, 2],
-  ZRH: [1, 2], GVA: [1, 2], BSL: [1, 2],
-  VIE: [1, 2], GRZ: [1, 2], SZG: [1, 2], INN: [1, 2],
-  FCO: [1, 2], MXP: [1, 2], LIN: [1, 2], VCE: [1, 2], NAP: [1, 2], BGY: [1, 2],
-  MAD: [1, 2], BCN: [1, 2], AGP: [1, 2], PMI: [1, 2], VLC: [1, 2], SVQ: [1, 2],
-  LIS: [0, 1], OPO: [0, 1], FAO: [0, 1],
-  CPH: [1, 2], ARN: [1, 2], OSL: [1, 2], HEL: [2, 3],
-  WAW: [1, 2], KRK: [1, 2], WRO: [1, 2], GDN: [1, 2],
-  PRG: [1, 2], BRQ: [1, 2],
-  BUD: [1, 2], DEB: [1, 2],
-  BEG: [1, 2], SKP: [1, 2], SOF: [2, 3], TGD: [1, 2], LJU: [1, 2], ZAG: [1, 2],
-  // Greece / Cyprus
-  ATH: [2, 3], SKG: [2, 3], HER: [2, 3], CFU: [2, 3], RHO: [2, 3], LCA: [2, 3],
-  // Turkey
-  IST: [3, 3], SAW: [3, 3], AYT: [3, 3], ADB: [3, 3],
-  // Middle East / Gulf
-  DXB: [4, 4], AUH: [4, 4], DOH: [3, 3], KWI: [3, 3], BAH: [3, 3], AMM: [2, 3],
-  TLV: [2, 3], BEY: [2, 3],
-  // Egypt
-  CAI: [2, 2], HRG: [2, 2], SSH: [2, 2],
-  // USA (Eastern)
-  JFK: [-5, -4], LGA: [-5, -4], EWR: [-5, -4], BOS: [-5, -4], MIA: [-5, -4],
-  ORD: [-6, -5], LAX: [-8, -7],
+  RMO:[2,3],KIV:[2,3],OTP:[2,3],CLJ:[2,3],IAS:[2,3],SBZ:[2,3],
+  LHR:[0,1],LGW:[0,1],STN:[0,1],LTN:[0,1],MAN:[0,1],BHX:[0,1],EDI:[0,1],GLA:[0,1],
+  DUB:[0,1],ORK:[0,1],BFS:[0,1],
+  CDG:[1,2],ORY:[1,2],NCE:[1,2],LYS:[1,2],MRS:[1,2],BOD:[1,2],TLS:[1,2],
+  FRA:[1,2],MUC:[1,2],BER:[1,2],DUS:[1,2],HAM:[1,2],CGN:[1,2],STR:[1,2],NUE:[1,2],
+  AMS:[1,2],BRU:[1,2],ZRH:[1,2],GVA:[1,2],BSL:[1,2],
+  VIE:[1,2],GRZ:[1,2],SZG:[1,2],INN:[1,2],
+  FCO:[1,2],MXP:[1,2],LIN:[1,2],VCE:[1,2],NAP:[1,2],BGY:[1,2],
+  MAD:[1,2],BCN:[1,2],AGP:[1,2],PMI:[1,2],VLC:[1,2],SVQ:[1,2],
+  LIS:[0,1],OPO:[0,1],FAO:[0,1],
+  CPH:[1,2],ARN:[1,2],OSL:[1,2],HEL:[2,3],
+  WAW:[1,2],KRK:[1,2],WRO:[1,2],GDN:[1,2],PRG:[1,2],BUD:[1,2],
+  BEG:[1,2],SKP:[1,2],SOF:[2,3],TGD:[1,2],LJU:[1,2],ZAG:[1,2],
+  ATH:[2,3],SKG:[2,3],HER:[2,3],CFU:[2,3],RHO:[2,3],LCA:[2,3],
+  IST:[3,3],SAW:[3,3],AYT:[3,3],ADB:[3,3],
+  DXB:[4,4],AUH:[4,4],DOH:[3,3],KWI:[3,3],BAH:[3,3],AMM:[2,3],TLV:[2,3],BEY:[2,3],
+  CAI:[2,2],HRG:[2,2],SSH:[2,2],
+  JFK:[-5,-4],LGA:[-5,-4],EWR:[-5,-4],BOS:[-5,-4],MIA:[-5,-4],ORD:[-6,-5],LAX:[-8,-7],
 };
 
-// Determine UTC offset for an airport on a given date (approximate DST: last Sun March → last Sun Oct)
-function airportUtcOffset(iata, dateStr) {
-  const tz = AIRPORT_TZ[(iata || '').toUpperCase()];
-  if (!tz) return 0; // unknown → assume UTC
-  if (!dateStr) return tz[0];
-  const d = new Date(dateStr + 'T12:00:00Z');
-  const y = d.getUTCFullYear();
-  // Last Sunday of March
-  const lastSunMar = new Date(Date.UTC(y, 2, 31));
-  lastSunMar.setUTCDate(31 - lastSunMar.getUTCDay());
-  // Last Sunday of October
-  const lastSunOct = new Date(Date.UTC(y, 9, 31));
-  lastSunOct.setUTCDate(31 - lastSunOct.getUTCDay());
-  const isDST = d >= lastSunMar && d < lastSunOct;
-  return isDST ? tz[1] : tz[0];
-}
-
-// Calculate flight duration string "Xh Ym" from two airports + times + dates
-function calcFlightDuration(depAp, depDate, depTime, arrAp, arrDate, arrTime) {
-  if (!depDate || !depTime || !arrDate || !arrTime) return null;
-  try {
-    const depOff = airportUtcOffset(depAp, depDate);
-    const arrOff = airportUtcOffset(arrAp, arrDate);
-    const depUtc = new Date(depDate + 'T' + depTime + ':00').getTime() - depOff * 3600000;
-    const arrUtc = new Date(arrDate + 'T' + arrTime + ':00').getTime() - arrOff * 3600000;
-    const diffMin = Math.round((arrUtc - depUtc) / 60000);
-    if (diffMin <= 0 || diffMin > 1800) return null;
-    const h = Math.floor(diffMin / 60);
-    const m = diffMin % 60;
-    return h + 'h ' + String(m).padStart(2, '0') + 'm';
-  } catch (e) { return null; }
-}
-
-// Format date "Thursday, 11 June 2026" from ISO string
-function fmtItinDate(isoDate, lang) {
-  if (!isoDate) return '';
-  const d = new Date(isoDate + 'T12:00:00');
-  if (isNaN(d.getTime())) return isoDate;
-  const locale = lang === 'RO' ? 'ro-RO' : 'en-GB';
-  return d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-}
-
-// Airport city name lookup (small subset of commonly used airports)
 const AIRPORT_CITIES = {
-  RMO: 'Chișinău', KIV: 'Chișinău', OTP: 'București', LHR: 'London', LGW: 'London',
-  STN: 'London', LTN: 'London', CDG: 'Paris', ORY: 'Paris', NCE: 'Nice', MRS: 'Marseille',
-  LYS: 'Lyon', FRA: 'Frankfurt', MUC: 'Munich', BER: 'Berlin', VIE: 'Vienna',
-  ZRH: 'Zürich', GVA: 'Geneva', AMS: 'Amsterdam', BRU: 'Brussels', FCO: 'Rome',
-  MXP: 'Milan', LIN: 'Milan', VCE: 'Venice', NAP: 'Naples', MAD: 'Madrid',
-  BCN: 'Barcelona', LIS: 'Lisbon', ATH: 'Athens', SKG: 'Thessaloniki', HER: 'Heraklion',
-  CFU: 'Corfu', WAW: 'Warsaw', PRG: 'Prague', BUD: 'Budapest', SOF: 'Sofia',
-  BEG: 'Belgrade', SKP: 'Skopje', DUB: 'Dublin', ARN: 'Stockholm', CPH: 'Copenhagen',
-  OSL: 'Oslo', HEL: 'Helsinki', IST: 'Istanbul', DXB: 'Dubai', AUH: 'Abu Dhabi',
-  DOH: 'Doha', TLV: 'Tel Aviv', CAI: 'Cairo', JFK: 'New York', LCA: 'Larnaca',
-  BGY: 'Milan', AGP: 'Málaga', PMI: 'Palma', TGD: 'Podgorica', LJU: 'Ljubljana',
-  ZAG: 'Zagreb', BOD: 'Bordeaux', TLS: 'Toulouse',
+  RMO:'Chișinău',KIV:'Chișinău',OTP:'București',LHR:'London',LGW:'London',STN:'London',
+  LTN:'London',CDG:'Paris',ORY:'Paris',NCE:'Nice',MRS:'Marseille',LYS:'Lyon',
+  FRA:'Frankfurt',MUC:'Munich',BER:'Berlin',VIE:'Vienna',ZRH:'Zürich',GVA:'Geneva',
+  AMS:'Amsterdam',BRU:'Brussels',FCO:'Rome',MXP:'Milan',LIN:'Milan',BGY:'Milan',
+  VCE:'Venice',NAP:'Naples',MAD:'Madrid',BCN:'Barcelona',AGP:'Málaga',PMI:'Palma',
+  LIS:'Lisbon',ATH:'Athens',SKG:'Thessaloniki',HER:'Heraklion',CFU:'Corfu',RHO:'Rhodes',
+  WAW:'Warsaw',PRG:'Prague',BUD:'Budapest',SOF:'Sofia',BEG:'Belgrade',SKP:'Skopje',
+  DUB:'Dublin',ARN:'Stockholm',CPH:'Copenhagen',OSL:'Oslo',HEL:'Helsinki',
+  IST:'Istanbul',DXB:'Dubai',AUH:'Abu Dhabi',DOH:'Doha',TLV:'Tel Aviv',LCA:'Larnaca',
+  CAI:'Cairo',HRG:'Hurghada',SSH:'Sharm el-Sheikh',JFK:'New York',BOD:'Bordeaux',
+  TLS:'Toulouse',ZAG:'Zagreb',LJU:'Ljubljana',TGD:'Podgorica',
 };
 
-function airportCity(iata) {
-  return AIRPORT_CITIES[(iata || '').toUpperCase()] || iata || '';
+const ITIN_I18N = {
+  EN:{title:'Travel Itinerary',booking_ref:'Booking reference',passenger:'PASSENGER',
+    name:'NAME',airline:'AIRLINE',flight_details:'FLIGHT DETAILS',flight:'FLIGHT',
+    cls:'CLASS',baggage:'BAGGAGE',price_total:'TOTAL PRICE',
+    footer1:'Thank you for choosing Anyway Travel for your journey.',
+    footer2:'For any changes or questions, please contact us.',
+    one_way:'E-ticket · One way',return_trip:'E-ticket · Return',multi:'E-ticket · Multi-city'},
+  RO:{title:'Itinerar de Călătorie',booking_ref:'Referință rezervare',passenger:'PASAGER',
+    name:'NUME',airline:'COMPANIE AERIANĂ',flight_details:'DETALII ZBOR',flight:'ZBOR',
+    cls:'CLASĂ',baggage:'BAGAJ',price_total:'PREȚ TOTAL',
+    footer1:'Vă mulțumim că ați ales Anyway Travel pentru călătoria dumneavoastră.',
+    footer2:'Pentru modificări sau întrebări, vă rugăm să ne contactați.',
+    one_way:'E-bilet · Dus',return_trip:'E-bilet · Dus-întors',multi:'E-bilet · Multi-destinație'},
+};
+
+function _itinAirportOffset(iata, dateStr) {
+  const tz = AIRPORT_TZ[(iata||'').toUpperCase()];
+  if (!tz) return 0;
+  if (!dateStr) return tz[0];
+  const d = new Date(dateStr+'T12:00:00Z');
+  const y = d.getUTCFullYear();
+  const lsm = new Date(Date.UTC(y,2,31)); lsm.setUTCDate(31-lsm.getUTCDay());
+  const lso = new Date(Date.UTC(y,9,31)); lso.setUTCDate(31-lso.getUTCDay());
+  return (d>=lsm && d<lso) ? tz[1] : tz[0];
 }
 
-// ── Itinerary i18n ──
-const ITIN_I18N = {
-  EN: {
-    title: 'Travel Itinerary',
-    booking_ref: 'Booking reference',
-    passenger: 'PASSENGER',
-    name: 'NAME',
-    airline: 'AIRLINE',
-    flight_details: 'FLIGHT DETAILS',
-    flight: 'FLIGHT',
-    cls: 'CLASS',
-    baggage: 'BAGGAGE',
-    price_total: 'TOTAL PRICE',
-    footer1: 'Thank you for choosing Anyway Travel for your journey.',
-    footer2: 'For any changes or questions, please contact us.',
-    one_way: 'E-ticket · One way',
-    return: 'E-ticket · Return',
-    multi: 'E-ticket · Multi-city',
-  },
-  RO: {
-    title: 'Itinerar de Călătorie',
-    booking_ref: 'Referință rezervare',
-    passenger: 'PASAGER',
-    name: 'NUME',
-    airline: 'COMPANIE AERIANĂ',
-    flight_details: 'DETALII ZBOR',
-    flight: 'ZBOR',
-    cls: 'CLASĂ',
-    baggage: 'BAGAJ',
-    price_total: 'PREȚ TOTAL',
-    footer1: 'Vă mulțumim că ați ales Anyway Travel pentru călătoria dumneavoastră.',
-    footer2: 'Pentru modificări sau întrebări, vă rugăm să ne contactați.',
-    one_way: 'E-bilet · Dus',
-    return: 'E-bilet · Dus-întors',
-    multi: 'E-bilet · Multi-destinație',
-  }
-};
+function _itinDuration(depAp,depDate,depTime,arrAp,arrDate,arrTime) {
+  if (!depDate||!depTime||!arrDate||!arrTime) return null;
+  try {
+    const d1 = new Date(depDate+'T'+depTime+':00').getTime() - _itinAirportOffset(depAp,depDate)*3600000;
+    const d2 = new Date(arrDate+'T'+arrTime+':00').getTime() - _itinAirportOffset(arrAp,arrDate)*3600000;
+    const m = Math.round((d2-d1)/60000);
+    if (m<=0||m>1800) return null;
+    return Math.floor(m/60)+'h '+String(m%60).padStart(2,'0')+'m';
+  } catch(e){ return null; }
+}
 
-// ── Modal open/close ──
-function openItineraryModal(preselectedTicketId) {
-  renderItineraryTicketList(preselectedTicketId);
+function _itinFmtDate(iso, lang) {
+  if (!iso) return '';
+  const d = new Date(iso+'T12:00:00');
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(lang==='RO'?'ro-RO':'en-GB',
+    {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}
+
+function openItineraryModal(preselectedId) {
+  _renderItinList(preselectedId);
   document.getElementById('itineraryModal').classList.add('open');
 }
 
@@ -10529,423 +10462,273 @@ function closeItineraryModal() {
   document.getElementById('itineraryModal').classList.remove('open');
 }
 
-function renderItineraryTicketList(preselectedId) {
-  const tickets = Object.values(state.tickets || {})
+function _renderItinList(preselectedId) {
+  const tickets = Object.values(state.tickets||{})
     .filter(t => t.transaction_type !== 'VOIDED')
-    .sort((a, b) => {
-      const da = a.segments?.[0]?.dep_date || a.issue_date || '';
-      const db = b.segments?.[0]?.dep_date || b.issue_date || '';
+    .sort((a,b) => {
+      const da = (a.segments||[])[0]?.dep_date || a.issue_date || '';
+      const db = (b.segments||[])[0]?.dep_date || b.issue_date || '';
       return da.localeCompare(db);
     });
-
   const c = document.getElementById('itineraryTicketList');
-  if (!tickets.length) {
-    c.innerHTML = '<p style="padding:12px;color:var(--text-muted);font-size:13px;">No tickets found.</p>';
-    return;
-  }
-
-  let html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
-  html += '<thead><tr style="background:var(--bg-page);position:sticky;top:0;">'
-    + '<th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--text-secondary);">✓</th>'
-    + '<th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--text-secondary);">Passenger</th>'
-    + '<th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--text-secondary);">Route</th>'
-    + '<th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--text-secondary);">Date</th>'
-    + '<th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--text-secondary);">PNR</th>'
-    + '</tr></thead><tbody>';
-
+  if (!tickets.length) { c.innerHTML='<p style="padding:12px;font-size:13px;color:var(--text-muted);">No tickets.</p>'; return; }
+  let html='<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+    +'<thead><tr style="background:var(--bg-page);position:sticky;top:0;">'
+    +'<th style="padding:5px 8px;"></th>'
+    +'<th style="padding:5px 8px;text-align:left;font-weight:600;">Passenger</th>'
+    +'<th style="padding:5px 8px;text-align:left;font-weight:600;">Route</th>'
+    +'<th style="padding:5px 8px;text-align:left;font-weight:600;">Date</th>'
+    +'<th style="padding:5px 8px;text-align:left;font-weight:600;">PNR</th>'
+    +'</tr></thead><tbody>';
   for (const t of tickets) {
     const pax = state.passengers[t.passenger_id];
-    const paxName = pax ? (pax.last_name + '/' + pax.first_name) : (t.passenger || '—');
-    const route = (t.segments || []).map(s => s.from).concat([(t.segments || []).slice(-1)[0]?.to]).filter(Boolean).join('→') || '—';
-    const depDate = t.segments?.[0]?.dep_date || t.issue_date || '';
-    const checked = (preselectedId && t.id === preselectedId) || (!preselectedId && false);
-    html += `<tr style="border-top:1px solid var(--border);">
-      <td style="padding:6px 10px;"><input type="checkbox" class="itin-tkt-cb" data-tid="${escapeHtml(t.id)}" ${checked ? 'checked' : ''} style="width:14px;height:14px;cursor:pointer;"></td>
-      <td style="padding:6px 10px;">${escapeHtml(paxName)}</td>
-      <td style="padding:6px 10px;font-family:monospace;">${escapeHtml(route)}</td>
-      <td style="padding:6px 10px;">${escapeHtml(depDate ? shortMonth(depDate) : '')}</td>
-      <td style="padding:6px 10px;font-family:monospace;">${escapeHtml(t.booking_ref || '')}</td>
+    const paxName = pax ? (pax.last_name+'/'+pax.first_name) : (t.passenger||'—');
+    const segs = t.segments||[];
+    const route = segs.length ? (segs.map(s=>s.from).concat([segs[segs.length-1]?.to]).filter(Boolean).join('→')) : '—';
+    const depDate = segs[0]?.dep_date || t.issue_date || '';
+    const checked = t.id === preselectedId;
+    html+=`<tr style="border-top:1px solid var(--border);">
+      <td style="padding:5px 8px;"><input type="checkbox" class="itin-cb" data-tid="${t.id}" ${checked?'checked':''} style="cursor:pointer;"></td>
+      <td style="padding:5px 8px;">${escapeHtml(paxName)}</td>
+      <td style="padding:5px 8px;font-family:monospace;">${escapeHtml(route)}</td>
+      <td style="padding:5px 8px;">${depDate?shortMonth(depDate):''}</td>
+      <td style="padding:5px 8px;font-family:monospace;">${escapeHtml(t.booking_ref||'')}</td>
     </tr>`;
   }
-  html += '</tbody></table>';
-  c.innerHTML = html;
-
-  // Update footer hint on checkbox change
-  c.querySelectorAll('.itin-tkt-cb').forEach(cb => {
-    cb.addEventListener('change', updateItineraryHint);
-  });
-  updateItineraryHint();
+  html+='</tbody></table>';
+  c.innerHTML=html;
+  c.querySelectorAll('.itin-cb').forEach(cb=>cb.addEventListener('change',_updateItinHint));
+  _updateItinHint();
 }
 
-function updateItineraryHint() {
-  const checked = document.querySelectorAll('.itin-tkt-cb:checked').length;
-  const hint = document.getElementById('itineraryFooterHint');
-  if (hint) hint.textContent = checked ? checked + ' ticket' + (checked !== 1 ? 's' : '') + ' selected' : '';
-  const btn = document.getElementById('itineraryGenerateBtn');
-  if (btn) btn.disabled = checked === 0;
+function _updateItinHint() {
+  const n = document.querySelectorAll('.itin-cb:checked').length;
+  const hint = document.getElementById('itineraryHint');
+  if (hint) hint.textContent = n ? n+' ticket'+(n!==1?'s':'')+' selected' : '';
+  const btn = document.getElementById('itineraryGenBtn');
+  if (btn) btn.disabled = n===0;
 }
 
-// ── PDF generation ──
 async function generateItineraryPdf() {
   if (typeof window.jspdf === 'undefined') {
-    showToast('PDF library not loaded yet. Please wait and try again.', 'error');
-    return;
+    showToast('PDF library not loaded. Please wait and retry.','error'); return;
   }
-  const checkedIds = Array.from(document.querySelectorAll('.itin-tkt-cb:checked')).map(cb => cb.dataset.tid);
-  if (!checkedIds.length) { showToast('Select at least one ticket', 'error'); return; }
-
-  const lang = document.getElementById('itineraryLang').value || 'EN';
+  const ids = Array.from(document.querySelectorAll('.itin-cb:checked')).map(cb=>cb.dataset.tid);
+  if (!ids.length) { showToast('Select at least one ticket','error'); return; }
+  const lang = document.getElementById('itineraryLang').value||'EN';
   const showPrice = document.getElementById('itineraryShowPrice').checked;
-  const T = ITIN_I18N[lang] || ITIN_I18N.EN;
+  const T = ITIN_I18N[lang]||ITIN_I18N.EN;
+  const tickets = ids.map(id=>state.tickets[id]).filter(Boolean);
 
-  const tickets = checkedIds.map(id => state.tickets[id]).filter(Boolean);
-  if (!tickets.length) return;
-
-  // Group passengers: collect unique passegers (by passenger_id) with their tickets
-  // For display: list all passengers at top, then all flight segments (deduplicated by flight_number+date)
+  // Build passenger list (unique by passenger_id)
   const paxMap = {};
   for (const t of tickets) {
-    const key = t.passenger_id || t.id;
+    const key = t.passenger_id||t.id;
     if (!paxMap[key]) {
       const p = state.passengers[t.passenger_id];
-      paxMap[key] = {
-        name: p ? (p.last_name + '/' + (p.first_name || '')) : (t.passenger || '—'),
-        tickets: []
-      };
+      paxMap[key] = p ? (p.last_name+'/'+(p.first_name||'')) : (t.passenger||'—');
     }
-    paxMap[key].tickets.push(t);
   }
-  const passengers = Object.values(paxMap);
+  const paxList = Object.values(paxMap);
 
-  // Collect all unique segments across tickets (deduplicate by flight+date)
-  const segsSeen = new Set();
-  const allSegments = [];
+  // Collect unique segments (by flight+date+dep+arr)
+  const seen = new Set();
+  const segs = [];
   for (const t of tickets) {
-    for (const s of (t.segments || [])) {
-      const key = (s.flight_number || '') + '|' + (s.dep_date || '') + '|' + (s.from || '') + '|' + (s.to || '');
-      if (!segsSeen.has(key)) {
-        segsSeen.add(key);
-        allSegments.push({ ...s, _baggage: t.baggage_allowance || '', _airline: t.airline || '' });
-      }
+    for (const s of (t.segments||[])) {
+      const k=(s.flight_number||'')+'|'+(s.dep_date||'')+'|'+(s.from||'')+'|'+(s.to||'');
+      if (!seen.has(k)) { seen.add(k); segs.push({...s, _bag:t.baggage_allowance||'', _air:t.airline||''}); }
     }
   }
-  allSegments.sort((a, b) => (a.dep_date || '') + (a.dep_time || '') > (b.dep_date || '') + (b.dep_time || '') ? 1 : -1);
+  segs.sort((a,b)=>((a.dep_date||'')+(a.dep_time||''))>((b.dep_date||'')+(b.dep_time||''))?1:-1);
 
-  // PNR (use first ticket's booking_ref or list unique ones)
-  const pnrs = [...new Set(tickets.map(t => t.booking_ref).filter(Boolean))];
-  const pnrStr = pnrs.join(' / ') || '—';
+  const pnrs = [...new Set(tickets.map(t=>t.booking_ref).filter(Boolean))];
+  const pnrStr = pnrs.join(' / ')||'—';
+  const airlineCode = tickets[0]?.airline||'';
+  const totalEur = tickets.reduce((s,t)=>s+(t.sale_eur||t.amount_eur||0),0);
 
-  // Airline display (first ticket)
-  const airlineCode = tickets[0].airline || '';
-
-  // Ticket type
-  const ticketType = allSegments.length === 1 ? T.one_way
-    : (allSegments.length === 2 && allSegments[0].from === allSegments[1].to) ? T.return
-    : T.multi;
-
-  // Total price (sum of sale_eur across selected tickets, or original_amount if no sale)
-  const totalEur = tickets.reduce((s, t) => s + (t.sale_eur || t.amount_eur || 0), 0);
-
+  // Load font
   const fontData = await loadPdfFontBase64();
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-
-  let baseFont = 'helvetica';
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({unit:'mm',format:'a4'});
+  let bf = 'helvetica';
   if (fontData) {
-    doc.addFileToVFS('Roboto-Regular.ttf', fontData.regular);
-    doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-    doc.addFileToVFS('Roboto-Bold.ttf', fontData.bold);
-    doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
-    baseFont = 'Roboto';
+    doc.addFileToVFS('Roboto-Regular.ttf',fontData.regular);
+    doc.addFont('Roboto-Regular.ttf','Roboto','normal');
+    doc.addFileToVFS('Roboto-Bold.ttf',fontData.bold);
+    doc.addFont('Roboto-Bold.ttf','Roboto','bold');
+    bf='Roboto';
   }
-  doc.setFont(baseFont, 'normal');
+  doc.setFont(bf,'normal');
 
-  const pageW = 210, pageH = 297;
-  const mL = 14, mR = 14, contentW = pageW - mL - mR;
+  const pW=210,pH=297,mL=14,mR=14,cW=pW-mL-mR;
+  const amber=[212,150,35], amberBg=[251,243,220];
+  const txtDark=[33,33,33], txtMid=[100,100,100], txtLight=[155,155,155];
+  const cardBg=[245,245,243];
 
-  // Brand colors
-  const amber  = [212, 150, 35];
-  const amberL = [251, 243, 220];
-  const olive  = [92, 107, 31];
-  const gray1  = [245, 245, 243];
-  const textDark = [33, 33, 33];
-  const textMid  = [100, 100, 100];
-  const textLight = [160, 160, 160];
+  // ── Header ──
+  try { doc.addImage(LOGO_BASE64,'JPEG',mL,10,38,9.5); } catch(e){}
+  doc.setFont(bf,'bold'); doc.setFontSize(8.5); doc.setTextColor(...txtDark);
+  doc.text('Anyway Travel SRL', pW-mR, 11, {align:'right'});
+  doc.setFont(bf,'normal'); doc.setFontSize(7.5); doc.setTextColor(...txtMid);
+  ['6, Nicolae Anestiade str., of. 29','MD-2012, Chișinău, Moldova','+373 22 859090','info@anyway.md']
+    .forEach((l,i)=>doc.text(l, pW-mR, 15+i*4, {align:'right'}));
+  doc.setDrawColor(...amber); doc.setLineWidth(0.6);
+  doc.line(mL,33,pW-mR,33);
 
-  // ── HEADER ──
-  // Logo top-left
-  try {
-    doc.addImage(LOGO_BASE64, 'JPEG', mL, 10, 38, 9.5);
-  } catch(e) {}
+  // ── Title banner ──
+  let y=36;
+  doc.setFillColor(...amber);
+  doc.roundedRect(mL,y,cW,14,2,2,'F');
+  doc.setFont(bf,'bold'); doc.setFontSize(15); doc.setTextColor(255,255,255);
+  doc.text(T.title, mL+7, y+9.5);
+  doc.setFont(bf,'normal'); doc.setFontSize(7.5); doc.setTextColor(255,255,232);
+  doc.text(T.booking_ref, pW-mR-5, y+5, {align:'right'});
+  doc.setFont(bf,'bold'); doc.setFontSize(12); doc.setTextColor(255,255,255);
+  doc.text(pnrStr, pW-mR-5, y+11.5, {align:'right'});
+  y+=20;
 
-  // Company info top-right
-  doc.setFont(baseFont, 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('Anyway Travel SRL', pageW - mR, 11, { align: 'right' });
-  doc.setFont(baseFont, 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(textMid[0], textMid[1], textMid[2]);
-  const addrLines = [
-    '6, Nicolae Anestiade str., of. 29',
-    'MD-2012, Chișinău, Moldova',
-    '+373 22 859090',
-    'info@anyway.md'
-  ];
-  addrLines.forEach((line, i) => {
-    doc.text(line, pageW - mR, 15 + i * 4, { align: 'right' });
-  });
-
-  // Amber separator line
-  doc.setDrawColor(amber[0], amber[1], amber[2]);
-  doc.setLineWidth(0.6);
-  doc.line(mL, 33, pageW - mR, 33);
-
-  // ── TITLE BANNER (amber background) ──
-  let y = 36;
-  doc.setFillColor(amber[0], amber[1], amber[2]);
-  doc.roundedRect(mL, y, contentW, 14, 2, 2, 'F');
-
-  doc.setFont(baseFont, 'bold');
-  doc.setFontSize(15);
-  doc.setTextColor(255, 255, 255);
-  doc.text(T.title, mL + 7, y + 9.5);
-
-  // Booking reference in banner (right side)
-  doc.setFont(baseFont, 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(255, 255, 232);
-  doc.text(T.booking_ref, pageW - mR - 5, y + 5, { align: 'right' });
-  doc.setFont(baseFont, 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(255, 255, 255);
-  doc.text(pnrStr, pageW - mR - 5, y + 11.5, { align: 'right' });
-
-  y += 20;
-
-  // ── PASSENGER SECTION ──
-  doc.setFont(baseFont, 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(amber[0], amber[1], amber[2]);
+  // ── Passenger section ──
+  doc.setFont(bf,'bold'); doc.setFontSize(8); doc.setTextColor(...amber);
   doc.text(T.passenger, mL, y);
+  doc.setDrawColor(...amber); doc.setLineWidth(0.3);
+  doc.line(mL, y+1.5, pW-mR, y+1.5);
+  y+=6;
 
-  // Amber underline
-  doc.setDrawColor(amber[0], amber[1], amber[2]);
-  doc.setLineWidth(0.3);
-  doc.line(mL, y + 1.5, pageW - mR, y + 1.5);
-  y += 5;
-
-  // For each passenger row
-  for (const pax of passengers) {
-    doc.setFont(baseFont, 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(textLight[0], textLight[1], textLight[2]);
+  for (const name of paxList) {
+    doc.setFont(bf,'normal'); doc.setFontSize(7.5); doc.setTextColor(...txtLight);
     doc.text(T.name, mL, y);
-
-    doc.setFont(baseFont, 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-    doc.text(pax.name, mL, y + 5);
-    y += 10;
+    doc.setFont(bf,'normal'); doc.setFontSize(10); doc.setTextColor(...txtDark);
+    doc.text(name, mL, y+5);
+    y+=10;
   }
 
-  // Airline row
-  doc.setFont(baseFont, 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(textLight[0], textLight[1], textLight[2]);
+  // Airline
+  doc.setFont(bf,'normal'); doc.setFontSize(7.5); doc.setTextColor(...txtLight);
   doc.text(T.airline, mL, y);
-  doc.setFont(baseFont, 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  // Get airline name from state or fallback to code
-  const airlineName = airlineCode || '—';
-  doc.text(airlineName, mL, y + 5);
-  y += 13;
+  doc.setFont(bf,'normal'); doc.setFontSize(10); doc.setTextColor(...txtDark);
+  doc.text(airlineCode||'—', mL, y+5);
+  y+=14;
 
-  // ── FLIGHT DETAILS SECTION ──
-  doc.setFont(baseFont, 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(amber[0], amber[1], amber[2]);
-  doc.text(T.flight_details, mL);
+  // ── Flight details ──
+  doc.setFont(bf,'bold'); doc.setFontSize(8); doc.setTextColor(...amber);
   doc.text(T.flight_details, mL, y);
-  doc.setDrawColor(amber[0], amber[1], amber[2]);
-  doc.setLineWidth(0.3);
-  doc.line(mL, y + 1.5, pageW - mR, y + 1.5);
-  y += 5;
+  doc.setDrawColor(...amber); doc.setLineWidth(0.3);
+  doc.line(mL, y+1.5, pW-mR, y+1.5);
+  y+=6;
 
-  // Each segment card
-  for (let si = 0; si < allSegments.length; si++) {
-    const seg = allSegments[si];
-    const duration = calcFlightDuration(seg.from, seg.dep_date, seg.dep_time, seg.to, seg.arr_date, seg.arr_time);
-    const depDateFmt = fmtItinDate(seg.dep_date, lang);
-    const arrDateFmt = fmtItinDate(seg.arr_date || seg.dep_date, lang);
-    const depCity = airportCity(seg.from);
-    const arrCity = airportCity(seg.to);
-    const cardH = 46 + (seg._baggage ? 8 : 0);
+  for (let si=0; si<segs.length; si++) {
+    const s=segs[si];
+    const dur=_itinDuration(s.from,s.dep_date,s.dep_time,s.to,s.arr_date,s.arr_time);
+    const depFmt=_itinFmtDate(s.dep_date,lang);
+    const arrFmt=_itinFmtDate(s.arr_date||s.dep_date,lang);
+    const depCity=AIRPORT_CITIES[(s.from||'').toUpperCase()]||s.from||'';
+    const arrCity=AIRPORT_CITIES[(s.to||'').toUpperCase()]||s.to||'';
+    const hasBag = !!s._bag;
+    const hasClass = !!s.class_of_service;
+    const cardH = 46 + (hasClass||hasBag ? 8 : 0) + (hasClass&&hasBag ? 5 : 0);
 
-    // Check if we need new page
-    if (y + cardH > pageH - 30) {
-      doc.addPage();
-      y = 20;
+    if (y+cardH > pH-28) { doc.addPage(); y=18; }
+
+    // Card
+    doc.setFillColor(...cardBg); doc.setDrawColor(210,208,200); doc.setLineWidth(0.25);
+    doc.roundedRect(mL,y,cW,cardH,2,2,'FD');
+    // Amber left strip
+    doc.setFillColor(...amber); doc.roundedRect(mL,y,2.5,cardH,1,1,'F');
+
+    // Flight N label
+    doc.setFont(bf,'normal'); doc.setFontSize(7); doc.setTextColor(...txtLight);
+    doc.text(T.flight+' '+(si+1), mL+6, y+6);
+
+    // Flight number pill
+    const fnum = s.flight_number||s._air||'';
+    if (fnum) {
+      const pw2=Math.max(doc.getTextWidth(fnum)+8,18);
+      doc.setFillColor(...amber);
+      doc.roundedRect(pW-mR-pw2, y+2.5, pw2, 6, 1.5,1.5,'F');
+      doc.setFont(bf,'bold'); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
+      doc.text(fnum, pW-mR-pw2/2, y+6.8, {align:'center'});
     }
 
-    // Card background
-    doc.setFillColor(gray1[0], gray1[1], gray1[2]);
-    doc.setDrawColor(220, 218, 210);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(mL, y, contentW, cardH, 2, 2, 'FD');
+    // DEP
+    doc.setFont(bf,'bold'); doc.setFontSize(22); doc.setTextColor(...amber);
+    doc.text(s.from||'—', mL+6, y+23);
+    doc.setFont(bf,'normal'); doc.setFontSize(8); doc.setTextColor(...txtMid);
+    doc.text(depCity, mL+6, y+28);
+    doc.setFont(bf,'bold'); doc.setFontSize(16); doc.setTextColor(...txtDark);
+    doc.text(s.dep_time||'—', mL+6, y+37);
+    doc.setFont(bf,'normal'); doc.setFontSize(7.5); doc.setTextColor(...txtMid);
+    doc.text(depFmt, mL+6, y+42);
 
-    // Left amber border strip
-    doc.setFillColor(amber[0], amber[1], amber[2]);
-    doc.roundedRect(mL, y, 2, cardH, 1, 1, 'F');
-
-    // "FLIGHT N" label
-    doc.setFont(baseFont, 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(textLight[0], textLight[1], textLight[2]);
-    doc.text(T.flight + ' ' + (si + 1), mL + 5, y + 6);
-
-    // Flight number pill (right side)
-    const flightNum = seg.flight_number || (seg._airline ? seg._airline : '');
-    if (flightNum) {
-      doc.setFillColor(amber[0], amber[1], amber[2]);
-      const pillW = Math.max(doc.getTextWidth(flightNum) + 8, 20);
-      doc.roundedRect(pageW - mR - pillW, y + 2.5, pillW, 6, 1.5, 1.5, 'F');
-      doc.setFont(baseFont, 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(255, 255, 255);
-      doc.text(flightNum, pageW - mR - pillW / 2, y + 6.8, { align: 'center' });
+    // Center
+    const cx=mL+cW/2;
+    doc.setFont(bf,'normal'); doc.setFontSize(13); doc.setTextColor(...amber);
+    doc.text('✈', cx, y+23, {align:'center'});
+    if (dur) {
+      const parts=dur.split(' ');
+      doc.setFontSize(7.5); doc.setTextColor(...txtMid);
+      doc.text(parts[0]||'', cx, y+29, {align:'center'});
+      doc.text(parts[1]||'', cx, y+33.5, {align:'center'});
     }
 
-    // DEP airport code (large)
-    doc.setFont(baseFont, 'bold');
-    doc.setFontSize(22);
-    doc.setTextColor(amber[0], amber[1], amber[2]);
-    doc.text(seg.from || '—', mL + 5, y + 22);
+    // ARR
+    doc.setFont(bf,'bold'); doc.setFontSize(22); doc.setTextColor(...amber);
+    doc.text(s.to||'—', pW-mR-6, y+23, {align:'right'});
+    doc.setFont(bf,'normal'); doc.setFontSize(8); doc.setTextColor(...txtMid);
+    doc.text(arrCity, pW-mR-6, y+28, {align:'right'});
+    doc.setFont(bf,'bold'); doc.setFontSize(16); doc.setTextColor(...txtDark);
+    doc.text(s.arr_time||'—', pW-mR-6, y+37, {align:'right'});
+    doc.setFont(bf,'normal'); doc.setFontSize(7.5); doc.setTextColor(...txtMid);
+    doc.text(arrFmt, pW-mR-6, y+42, {align:'right'});
 
-    // DEP city
-    doc.setFont(baseFont, 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(textMid[0], textMid[1], textMid[2]);
-    doc.text(depCity, mL + 5, y + 27);
+    // Separator
+    doc.setDrawColor(195,193,185); doc.setLineWidth(0.2);
+    doc.setLineDashPattern([1,1.5],0);
+    doc.line(mL+5, y+44.5, pW-mR-5, y+44.5);
+    doc.setLineDashPattern([],0);
 
-    // DEP time (large)
-    doc.setFont(baseFont, 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-    doc.text(seg.dep_time || '—', mL + 5, y + 36);
-
-    // DEP date
-    doc.setFont(baseFont, 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(textMid[0], textMid[1], textMid[2]);
-    doc.text(depDateFmt, mL + 5, y + 41);
-
-    // Center: plane icon + duration
-    const cx = mL + contentW / 2;
-    doc.setFont(baseFont, 'normal');
-    doc.setFontSize(14);
-    doc.setTextColor(amber[0], amber[1], amber[2]);
-    doc.text('✈', cx, y + 22, { align: 'center' });
-    if (duration) {
-      const durParts = duration.split(' ');
-      doc.setFont(baseFont, 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(textMid[0], textMid[1], textMid[2]);
-      doc.text(durParts[0], cx, y + 27.5, { align: 'center' });
-      doc.text(durParts[1] || '', cx, y + 31.5, { align: 'center' });
+    let iy=y+50;
+    if (hasClass) {
+      doc.setFont(bf,'normal'); doc.setFontSize(7); doc.setTextColor(...txtLight);
+      doc.text(T.cls+':', mL+6, iy);
+      doc.setFontSize(7.5); doc.setTextColor(...amber);
+      doc.text(s.class_of_service, mL+6+doc.getTextWidth(T.cls+': '), iy);
+      iy+=5;
+    }
+    if (hasBag) {
+      doc.setFont(bf,'normal'); doc.setFontSize(7); doc.setTextColor(...txtLight);
+      doc.text(T.baggage+':', mL+6, iy);
+      doc.setFontSize(7.5); doc.setTextColor(...txtDark);
+      doc.text('• '+s._bag, mL+6+doc.getTextWidth(T.baggage+': '), iy);
     }
 
-    // ARR airport code (large, right-aligned)
-    doc.setFont(baseFont, 'bold');
-    doc.setFontSize(22);
-    doc.setTextColor(amber[0], amber[1], amber[2]);
-    doc.text(seg.to || '—', pageW - mR - 5, y + 22, { align: 'right' });
-
-    // ARR city
-    doc.setFont(baseFont, 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(textMid[0], textMid[1], textMid[2]);
-    doc.text(arrCity, pageW - mR - 5, y + 27, { align: 'right' });
-
-    // ARR time
-    doc.setFont(baseFont, 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-    doc.text(seg.arr_time || '—', pageW - mR - 5, y + 36, { align: 'right' });
-
-    // ARR date
-    doc.setFont(baseFont, 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(textMid[0], textMid[1], textMid[2]);
-    doc.text(arrDateFmt, pageW - mR - 5, y + 41, { align: 'right' });
-
-    // Dashed separator inside card
-    doc.setDrawColor(200, 198, 190);
-    doc.setLineWidth(0.2);
-    doc.setLineDashPattern([1, 1.5], 0);
-    doc.line(mL + 4, y + 44, pageW - mR - 4, y + 44);
-    doc.setLineDashPattern([], 0);
-
-    // Class
-    let infoY = y + 49;
-    if (seg.class_of_service) {
-      doc.setFont(baseFont, 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(textLight[0], textLight[1], textLight[2]);
-      doc.text(T.cls + ':', mL + 5, infoY);
-      doc.setFont(baseFont, 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(amber[0], amber[1], amber[2]);
-      doc.text(seg.class_of_service, mL + 5 + doc.getTextWidth(T.cls + ': '), infoY);
-      infoY += 5;
-    }
-
-    // Baggage
-    if (seg._baggage) {
-      doc.setFont(baseFont, 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(textLight[0], textLight[1], textLight[2]);
-      doc.text(T.baggage + ':', mL + 5, infoY);
-      doc.setFontSize(7.5);
-      doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-      doc.text('• ' + seg._baggage, mL + 5 + doc.getTextWidth(T.baggage + ': '), infoY);
-    }
-
-    y += cardH + 5;
+    y+=cardH+5;
   }
 
-  // ── PRICE SECTION ──
-  if (showPrice && totalEur > 0) {
-    if (y + 18 > pageH - 30) { doc.addPage(); y = 20; }
-    doc.setFillColor(amberL[0], amberL[1], amberL[2]);
-    doc.roundedRect(mL, y, contentW, 14, 2, 2, 'F');
-    doc.setFont(baseFont, 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(amber[0], amber[1], amber[2]);
-    doc.text(T.price_total, mL + 7, y + 5.5);
-    doc.setFontSize(13);
-    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-    doc.text('EUR ' + totalEur.toFixed(2).replace('.', ','), pageW - mR - 5, y + 10, { align: 'right' });
-    y += 20;
+  // ── Price ──
+  if (showPrice && totalEur>0) {
+    if (y+16>pH-28) { doc.addPage(); y=18; }
+    doc.setFillColor(...amberBg);
+    doc.roundedRect(mL,y,cW,14,2,2,'F');
+    doc.setFont(bf,'bold'); doc.setFontSize(8); doc.setTextColor(...amber);
+    doc.text(T.price_total, mL+7, y+5.5);
+    doc.setFontSize(13); doc.setTextColor(...txtDark);
+    doc.text('EUR '+totalEur.toFixed(2).replace('.',','), pW-mR-6, y+10, {align:'right'});
+    y+=20;
   }
 
-  // ── FOOTER ──
-  const footY = Math.max(y + 10, pageH - 28);
-  doc.setDrawColor(220, 218, 210);
-  doc.setLineWidth(0.3);
-  doc.line(mL, footY - 3, pageW - mR, footY - 3);
-  doc.setFont(baseFont, 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(textMid[0], textMid[1], textMid[2]);
-  doc.text(T.footer1, pageW / 2, footY + 4, { align: 'center' });
-  doc.text(T.footer2, pageW / 2, footY + 9, { align: 'center' });
+  // ── Footer ──
+  const fy=Math.max(y+8, pH-28);
+  doc.setDrawColor(210,208,200); doc.setLineWidth(0.3);
+  doc.line(mL,fy-3,pW-mR,fy-3);
+  doc.setFont(bf,'normal'); doc.setFontSize(8); doc.setTextColor(...txtMid);
+  doc.text(T.footer1, pW/2, fy+4, {align:'center'});
+  doc.text(T.footer2, pW/2, fy+9, {align:'center'});
 
-  // Save
-  const safePnr = pnrStr.replace(/[^A-Z0-9]/gi, '_');
-  doc.save('Itinerary_' + safePnr + '.pdf');
+  const fname='Itinerary_'+pnrStr.replace(/[^A-Z0-9]/gi,'_')+'.pdf';
+  doc.save(fname);
   closeItineraryModal();
-  showToast('Itinerary PDF generated', 'success');
+  showToast('Itinerary PDF generated','success');
 }
 
 function ensurePassengerFromImport(paxFields) {
