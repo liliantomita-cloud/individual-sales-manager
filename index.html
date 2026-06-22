@@ -146,6 +146,8 @@ body.sidebar-collapsed .sidebar-footer { padding: 8px; }
 .invoice-status-paid { background: #d1fae5; color: #065f46; }
 .invoice-row-selected td { background: #dbeafe !important; }
 .invoice-row-selected:hover td { background: #bfdbfe !important; }
+.delete-row-selected td { background: #fee2e2 !important; }
+.delete-row-selected:hover td { background: #fecaca !important; }
 .row-debtor td { background: #fffbeb; }
 .row-debtor:hover td { background: #fef3c7; }
 .debtor-amount { color: #b45309; font-weight: 700; }
@@ -491,16 +493,19 @@ body.sidebar-collapsed .sidebar-footer { padding: 8px; }
       <div class="tab-pane active" id="tab-tickets">
         <div class="toolbar">
           <div class="search-box">
-            <input type="text" id="ticketSearch" placeholder="Search PNR, ticket #, passenger, client…" oninput="renderTickets()">
+            <input type="text" id="ticketSearch" placeholder="Search PNR, ticket #, passenger, client, order…" oninput="renderTickets()">
           </div>
           <button class="filter-chip active" data-filter="all" onclick="setTicketFilter('all', event)">All</button>
           <button class="filter-chip" data-filter="upcoming" onclick="setTicketFilter('upcoming', event)">Upcoming</button>
           <button class="filter-chip" data-filter="unpaid" onclick="setTicketFilter('unpaid', event)">Unpaid</button>
           <button class="filter-chip" data-filter="attention" onclick="setTicketFilter('attention', event)">🚩 Attention</button>
-          <button class="filter-chip" data-filter="hasref" onclick="setTicketFilter('hasref', event)">Has ref</button>
-          <button class="filter-chip" id="toggleRefColBtn" onclick="toggleClientRefColumn()" style="margin-left:auto;">+ Show Client Ref</button>
+          <button class="filter-chip" data-filter="hasref" onclick="setTicketFilter('hasref', event)">Has order</button>
+          <button class="filter-chip" onclick="openOrderInvoicePrompt()" title="Find all uninvoiced tickets with a given Order and create one invoice">🧾 Invoice by Order</button>
+          <button class="filter-chip" id="toggleRefColBtn" onclick="toggleClientRefColumn()" style="margin-left:auto;">+ Show Order</button>
           <button class="filter-chip" id="toggleInvoiceModeBtn" onclick="toggleInvoiceSelectMode()" title="Select tickets to put on an invoice">🧾 Invoice mode</button>
           <button class="btn btn-primary" id="createInvoiceFromSelectedBtn" onclick="createInvoiceFromSelectedTickets()" style="display:none;">+ Invoice selected</button>
+          <button class="filter-chip" id="toggleDeleteModeBtn" onclick="toggleDeleteSelectMode()" title="Select tickets to delete in bulk">🗑 Delete mode</button>
+          <button class="btn btn-danger" id="deleteSelectedTicketsBtn" onclick="deleteSelectedTickets()" style="display:none;">🗑 Delete selected</button>
           <div class="toolbar-spacer" style="flex: 0;"></div>
           <div class="export-dropdown">
             <button class="btn btn-secondary" onclick="toggleExportMenu(event)">⬇ Export ▾</button>
@@ -903,10 +908,10 @@ body.sidebar-collapsed .sidebar-footer { padding: 8px; }
               </div>
             </div>
             <div class="form-field full" id="f_client_reference_wrap">
-              <label>Client ref</label>
-              <input type="text" id="f_client_reference" list="f_client_reference_options" placeholder="e.g. job number, team code…" autocomplete="off">
+              <label>Order</label>
+              <input type="text" id="f_client_reference" list="f_client_reference_options" placeholder="e.g. job number, group code…" autocomplete="off">
               <datalist id="f_client_reference_options"></datalist>
-              <span class="hint" id="f_client_reference_hint">Set client's reference codes in their profile to enable autocomplete</span>
+              <span class="hint" id="f_client_reference_hint">Tickets sharing the same Order can be invoiced together</span>
             </div>
           </div>
         </div>
@@ -1430,6 +1435,8 @@ let state = {
   // Invoice select mode in Tickets tab
   invoiceSelectMode: false,
   invoiceSelectedTicketIds: {},  // { ticketId: true }
+  deleteSelectMode: false,
+  deleteSelectedTicketIds: {},  // { ticketId: true }
   showClientRefColumn: false,  // hidden by default per Lilian's preference
   agent: 'Lilian',
   isAdmin: false,  // role marker; admin sees Dashboard, Settings, Reports
@@ -2637,6 +2644,9 @@ window.addEventListener('resize', syncToolbarHeight);
 // INVOICE SELECT MODE (Phase 3 — flow from Tickets tab)
 // ============================================================
 function toggleInvoiceSelectMode() {
+  if (!state.invoiceSelectMode && state.deleteSelectMode) {
+    toggleDeleteSelectMode();
+  }
   state.invoiceSelectMode = !state.invoiceSelectMode;
   if (!state.invoiceSelectMode) state.invoiceSelectedTicketIds = {};
   const btn = document.getElementById('toggleInvoiceModeBtn');
@@ -2664,6 +2674,146 @@ function updateInvoiceSelectedCountBadge() {
   const n = Object.keys(state.invoiceSelectedTicketIds).length;
   btn.textContent = n > 0 ? `+ Invoice ${n} selected` : '+ Invoice selected';
   btn.disabled = n === 0;
+}
+
+// ── Delete mode (bulk delete via checkboxes, mirrors Invoice mode) ──
+function toggleDeleteSelectMode() {
+  // Exiting invoice mode if entering delete mode (checkbox column is shared, avoid confusion)
+  if (!state.deleteSelectMode && state.invoiceSelectMode) {
+    toggleInvoiceSelectMode();
+  }
+  state.deleteSelectMode = !state.deleteSelectMode;
+  if (!state.deleteSelectMode) state.deleteSelectedTicketIds = {};
+  const btn = document.getElementById('toggleDeleteModeBtn');
+  const delBtn = document.getElementById('deleteSelectedTicketsBtn');
+  if (btn) {
+    btn.classList.toggle('active', state.deleteSelectMode);
+    btn.textContent = state.deleteSelectMode ? '✕ Exit delete mode' : '🗑 Delete mode';
+  }
+  if (delBtn) {
+    delBtn.style.display = state.deleteSelectMode ? '' : 'none';
+    updateDeleteSelectedCountBadge();
+  }
+  renderTickets();
+}
+
+function toggleTicketDeleteSelection(ticketId, checked) {
+  if (checked) state.deleteSelectedTicketIds[ticketId] = true;
+  else delete state.deleteSelectedTicketIds[ticketId];
+  updateDeleteSelectedCountBadge();
+}
+
+function updateDeleteSelectedCountBadge() {
+  const btn = document.getElementById('deleteSelectedTicketsBtn');
+  if (!btn) return;
+  const n = Object.keys(state.deleteSelectedTicketIds).length;
+  btn.textContent = n > 0 ? `🗑 Delete ${n} selected` : '🗑 Delete selected';
+  btn.disabled = n === 0;
+}
+
+async function deleteSelectedTickets() {
+  const selectedIds = Object.keys(state.deleteSelectedTicketIds);
+  if (selectedIds.length === 0) {
+    showToast('Select at least one ticket first', 'error');
+    return;
+  }
+
+  // Warn if any selected ticket is already on an invoice — deleting it leaves a dangling reference.
+  const onInvoice = selectedIds.filter(id => ticketInvoiceInfo(id));
+  let warnMsg = `Delete ${selectedIds.length} ticket(s)? This cannot be undone.`;
+  if (onInvoice.length > 0) {
+    warnMsg += `\n\n⚠️ ${onInvoice.length} of them are on an invoice — the invoice will keep a reference to a missing ticket. Consider removing them from the invoice first.`;
+  }
+  if (!window.confirm(warnMsg)) return;
+
+  document.getElementById('deleteSelectedTicketsBtn').disabled = true;
+  document.getElementById('deleteSelectedTicketsBtn').textContent = 'Deleting…';
+
+  let deletedCount = 0;
+  // Group by transaction_id so we can also clean up Transactions left with zero tickets
+  const affectedTxIds = new Set();
+  for (const tid of selectedIds) {
+    const t = state.tickets[tid];
+    if (!t) continue;
+    affectedTxIds.add(t.transaction_id);
+    delete state.tickets[tid];
+    await saveToFirebase('tickets/' + tid, null);
+    deletedCount++;
+  }
+
+  // Clean up transactions that no longer have any tickets pointing to them
+  let cleanedTx = 0;
+  for (const txId of affectedTxIds) {
+    if (!txId) continue;
+    const stillUsed = Object.values(state.tickets).some(t => t.transaction_id === txId);
+    if (!stillUsed && state.transactions[txId]) {
+      delete state.transactions[txId];
+      await saveToFirebase('transactions/' + txId, null);
+      cleanedTx++;
+    }
+  }
+
+  state.deleteSelectMode = false;
+  state.deleteSelectedTicketIds = {};
+  document.getElementById('toggleDeleteModeBtn').classList.remove('active');
+  document.getElementById('toggleDeleteModeBtn').textContent = '🗑 Delete mode';
+  document.getElementById('deleteSelectedTicketsBtn').style.display = 'none';
+  document.getElementById('deleteSelectedTicketsBtn').disabled = false;
+  renderTickets();
+  renderTransactions && renderTransactions();
+  showToast(`Deleted ${deletedCount} ticket(s)` + (cleanedTx ? ` + ${cleanedTx} empty transaction(s)` : ''), 'success');
+}
+
+// Quick entry point: type an Order ref, find all its uninvoiced tickets,
+// and open the invoice modal pre-filled — same mechanism as "Invoice mode"
+// multi-select, just skipping the manual click-through.
+function openOrderInvoicePrompt() {
+  const ref = (window.prompt('Order ref to invoice (e.g. job number, group code):') || '').trim();
+  if (!ref) return;
+
+  const matches = Object.values(state.tickets).filter(t =>
+    (t.client_reference || '').trim().toLowerCase() === ref.toLowerCase()
+  );
+  if (matches.length === 0) {
+    showToast('No tickets found with Order "' + ref + '"', 'error');
+    return;
+  }
+
+  const uninvoiced = matches.filter(t => !ticketInvoiceInfo(t.id));
+  if (uninvoiced.length === 0) {
+    showToast('All ' + matches.length + ' ticket(s) with Order "' + ref + '" are already invoiced', 'error');
+    return;
+  }
+
+  const clientIds = new Set(uninvoiced.map(t => t.client_id).filter(Boolean));
+  if (clientIds.size === 0) {
+    showToast('Tickets with Order "' + ref + '" have no client assigned. Assign a client first.', 'error');
+    return;
+  }
+  if (clientIds.size > 1) {
+    showToast('Order "' + ref + '" spans ' + clientIds.size + ' different clients — invoice them separately.', 'error');
+    return;
+  }
+
+  const clientId = [...clientIds][0];
+  const skipped = matches.length - uninvoiced.length;
+  if (skipped > 0) {
+    showToast(skipped + ' ticket(s) already invoiced were skipped. Adding ' + uninvoiced.length + ' to a new invoice.', 'success');
+  }
+  openInvoiceModal({ clientId, preselectedTicketIds: uninvoiced.map(t => t.id) });
+}
+
+// Returns the invoice {id, number, status} a ticket is currently on, or null.
+function ticketInvoiceInfo(ticketId) {
+  for (const id in state.invoices) {
+    const inv = state.invoices[id];
+    for (const line of (inv.lines || [])) {
+      if (line.ticket_ids && line.ticket_ids.includes(ticketId)) {
+        return { id: inv.id, number: inv.number, status: inv.status };
+      }
+    }
+  }
+  return null;
 }
 
 function createInvoiceFromSelectedTickets() {
@@ -3065,7 +3215,7 @@ function getFilteredTickets() {
       const pax = state.passengers[t.passenger_id];
       const cli = state.clients[t.client_id];
       const haystack = [
-        t.document_number, t.booking_ref, t.airline, t.notes,
+        t.document_number, t.booking_ref, t.airline, t.notes, t.client_reference,
         pax ? (pax.last_name + ' ' + pax.first_name) : '',
         cli ? cli.name : '',
         (t.segments || []).map(s => s.from + ' ' + s.to + ' ' + s.flight_number).join(' ')
@@ -3213,6 +3363,7 @@ function renderTickets() {
 
   let html = '<div class="table-container"><table class="table"><thead><tr>' +
     (state.invoiceSelectMode ? '<th style="width:30px;text-align:center;">☑</th>' : '') +
+    (state.deleteSelectMode ? '<th style="width:30px;text-align:center;">☑</th>' : '') +
     '<th>Issue</th>' +
     '<th>Ref</th>' +
     '<th>Pax</th>' +
@@ -3226,7 +3377,7 @@ function renderTickets() {
     '<th style="text-align:right">Profit</th>' +
     '<th>Pay</th>' +
     '<th>Until&nbsp;dep.</th>' +
-    (showRef ? '<th>Client Ref</th>' : '') +
+    (showRef ? '<th>Order</th>' : '') +
     '<th>🚩</th>' +
     '<th>Agent</th>' +
     '</tr></thead><tbody>';
@@ -3359,16 +3510,24 @@ function renderTickets() {
 
     const inSelectMode = state.invoiceSelectMode;
     const isSelected = !!state.invoiceSelectedTicketIds[t.id];
-    const rowClick = inSelectMode
+    const inDeleteMode = state.deleteSelectMode;
+    const isDelSelected = !!state.deleteSelectedTicketIds[t.id];
+    const rowClick = inDeleteMode
+      ? `onclick="event.stopPropagation(); const cb=this.querySelector('input.del-select-cb'); if(cb){cb.checked=!cb.checked; toggleTicketDeleteSelection('${t.id}', cb.checked); this.classList.toggle('delete-row-selected', cb.checked);}"`
+      : inSelectMode
       ? `onclick="event.stopPropagation(); const cb=this.querySelector('input.inv-select-cb'); if(cb){cb.checked=!cb.checked; toggleTicketInvoiceSelection('${t.id}', cb.checked); this.classList.toggle('invoice-row-selected', cb.checked);}"`
       : `onclick="editTicket('${t.id}')"`;
     const selectCell = inSelectMode
       ? `<td style="width:30px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" class="inv-select-cb" ${isSelected ? 'checked' : ''} onchange="toggleTicketInvoiceSelection('${t.id}', this.checked); this.closest('tr').classList.toggle('invoice-row-selected', this.checked);"></td>`
       : '';
-    const rowClassWithSelected = rowClass + (inSelectMode && isSelected ? ' invoice-row-selected' : '');
+    const deleteSelectCell = inDeleteMode
+      ? `<td style="width:30px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" class="del-select-cb" ${isDelSelected ? 'checked' : ''} onchange="toggleTicketDeleteSelection('${t.id}', this.checked); this.closest('tr').classList.toggle('delete-row-selected', this.checked);"></td>`
+      : '';
+    const rowClassWithSelected = rowClass + (inSelectMode && isSelected ? ' invoice-row-selected' : '') + (inDeleteMode && isDelSelected ? ' delete-row-selected' : '');
 
     html += `<tr ${groupStyle} class="${rowClassWithSelected}" ${rowClick}>
       ${selectCell}
+      ${deleteSelectCell}
       <td class="cell-date">${fmtDate(t.issue_date)}</td>
       <td>${refCell}</td>
       <td class="cell-pax">${escapeHtml((pax.last_name || '') + '/' + (pax.first_name || ''))}<span class="pax-meta">${statusBadgeHtml}${inGroup ? ' · ' + (t.document_seq || '?') + ' of ' + txSizes[t.transaction_id] : ''}</span></td>
@@ -3394,7 +3553,7 @@ function renderTickets() {
 function toggleClientRefColumn() {
   state.showClientRefColumn = !state.showClientRefColumn;
   const btn = document.getElementById('toggleRefColBtn');
-  if (btn) btn.textContent = state.showClientRefColumn ? '− Hide Client Ref' : '+ Show Client Ref';
+  if (btn) btn.textContent = state.showClientRefColumn ? '− Hide Order' : '+ Show Order';
   renderTickets();
 }
 
@@ -9892,6 +10051,7 @@ function parseSheetLedger(rows) {
     const pnrRaw = get('PNR/TKNE');
     const pnrParsed = parseLedgerPnr(pnrRaw);
     const client = get('Client');
+    const jobNr = get('JOB NR');
     const remarka = get('Remarka');
     const roe = parseFloat(get('ROE')) || 0;
     const saleEur = parseFloat(get('EUR FOP (pret client)')) || 0;
@@ -9944,6 +10104,7 @@ function parseSheetLedger(rows) {
         service_fee_mdl: perPaxSf * roe,
         commercial_roe: roe,
         client_name_hint: client,
+        client_reference: jobNr || null,
         notes: groupNote,
         fop_parsed: { method: 'card', card_id: null, card_type: fop.card_type, card_last4: fop.card_last4 }
       });
@@ -10344,7 +10505,7 @@ async function confirmGdsImport() {
           service_fee_eur: isVoid ? 0 : t.service_fee_eur,
           service_fee_mdl: isVoid ? 0 : t.service_fee_mdl,
           client_id: clientId,
-          client_reference: t.client_name_hint || '',
+          client_reference: t.client_reference || '',
           billing_mode: 'Invoice',
           travel_status: isVoid ? 'Cancelled' : 'Upcoming',
           client_payment_status: 'Unpaid',
