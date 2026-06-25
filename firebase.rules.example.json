@@ -1,0 +1,14 @@
+{
+  "rules": {
+    "ism": {
+      "anyway-travel-team": {
+        ".read": "auth != null && (auth.token.email == 'lilian@example.com' || auth.token.email == 'agent@example.com')",
+        ".write": "auth != null && (auth.token.email == 'lilian@example.com' || auth.token.email == 'agent@example.com')"
+      },
+      "$otherWorkspace": {
+        ".read": false,
+        ".write": false
+      }
+    }
+  }
+}
